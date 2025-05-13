@@ -1,0 +1,52 @@
+# Paths
+paths:
+  tf2_game_executable: "C:\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf_win64.exe"
+  tf2_console_log: "C:\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\console.log"
+  debug_save_dir: "C:\\Users\\user\\Documents\\team-frotress-2\\debug-logs"
+debug: true # debug mode
+
+# networking
+networking:
+  intiface_server_addr: "ws://127.0.0.1:12345"
+  rcon_port: 2541 # Change if another program is using this port
+
+# TF2 config
+tf2:
+  resolution: [2560, 1440] # resolution [width, height]
+  enable_weaponswitch: true # To track weapon switch events
+  update_speed: 2 # Speed in updates per second. Values > 10 are not recommended
+  base_vibe: 0.0 # Base vibration intensity that will always be active
+  activate_command: "" # TF2 command to execute when vibe is turned on
+  deactivate_command: "" # TF2 command to execute when vibe is turned off
+  extra_launch_options: "-novid -nojoy -nosteamcontroller -nohltv -particles 1 -precachefontchars -noquicktime"
+
+# Vibe settings
+vibe:
+  # Kills
+  kill_strength: 0.3 # Base kill vibe strength. 0 to disable.
+  kill_time: 1 # Time in seconds to keep the kill vibe active
+  kill_crit_strength_multiplier: 2.0 # Multiplier for crit kills
+  kill_crit_time_multiplier: 1.5 # Multiplier for crit kills
+
+  # Killstreaks. When at killstreak_max, vibe strength = kill_strength * killstreak_strength_multiplier
+  killstreak_strength_multiplier: 2 # Multiplier for killstreaks upon reaching killstreak_max
+  killstreak_time_multiplier: 1.5 # Time multiplier for killstreaks
+  killstreak_max: 20 # Max killstreak scaling
+
+  # Death vibes 
+  death_strength: 0.0 # Base death vibe strength. 0 to disable
+  death_time: 0 # Time in seconds to keep the death vibe active
+
+  # Uber vibes
+  uber_active_strength: 0.5 # Uber activation vibe strength. 0 to disable
+  uber_streak_multiplier: 1.1 # Multipier per ubers done in one life
+  uber_milestones: [25, 50, 75, 99] # Uber milestones to trigger a vibe (percentage)
+  uber_milestone_strength: 0.2 # Strength of the vibe when reaching a milestone
+  uber_milestone_time: 0.5 # Time in seconds to keep the milestone vibe active
+  uber_milestone_strength_multiplier: 1.0 # Each time reaching 100%, the uber_milestone_strength is multiplied by this value
+  uber_milestone_time_multiplier: 1.0 # Each time reaching 100%, the uber_milestone_time is multiplied by this value
+
+
+
+
+

@@ -27,6 +27,7 @@ class VibrationHandler:
 
     def death(self):
         self.killstreak = 0
+        self.end_uber_death()
         self.timed_buzz(DEATH_STRENGTH, DEATH_TIME)
 
     def kill(self, crit=False):
@@ -34,12 +35,16 @@ class VibrationHandler:
         # [0, 1]
         killstreak_coeff = min(self.killstreak, KILLSTREAK_MAX) / (KILLSTREAK_MAX)
 
-        strength = KILL_STRENGTH * \
-                   (killstreak_coeff * (KILLSTREAK_STRENGTH_MULTIPLIER - 1.0) + 1.0) * \
-                   (KILL_CRIT_STRENGTH_MULTIPLIER if crit else 1.0)
-        time = KILL_TIME * \
-               (killstreak_coeff * (KILLSTREAK_TIME_MULTIPLIER - 1.0) + 1.0) * \
-               (KILL_CRIT_TIME_MULTIPLIER if crit else 1.0)
+        strength = (
+            KILL_STRENGTH
+            * (killstreak_coeff * (KILLSTREAK_STRENGTH_MULTIPLIER - 1.0) + 1.0)
+            * (KILL_CRIT_STRENGTH_MULTIPLIER if crit else 1.0)
+        )
+        time = (
+            KILL_TIME
+            * (killstreak_coeff * (KILLSTREAK_TIME_MULTIPLIER - 1.0) + 1.0)
+            * (KILL_CRIT_TIME_MULTIPLIER if crit else 1.0)
+        )
 
         self.timed_buzz(strength, time)
 
@@ -49,18 +54,21 @@ class VibrationHandler:
                 self.logger.info(f"Hit Uber milestone {x}")
                 uber_milestone_coeff = i / len(UBER_MILESTONES) - 1
                 self.timed_buzz(
-                    UBER_MILESTONE_STRENGTH *
-                    (uber_milestone_coeff * (UBER_MILESTONE_STRENGTH_MULTIPLIER - 1.0) + 1.0),
-                    UBER_MILESTONE_TIME *
-                    (uber_milestone_coeff * (UBER_MILESTONES_TIME_MULTIPLIER - 1.0) + 1.0)
+                    UBER_MILESTONE_STRENGTH
+                    * (uber_milestone_coeff * (UBER_MILESTONE_STRENGTH_MULTIPLIER - 1.0) + 1.0),
+                    UBER_MILESTONE_TIME * (uber_milestone_coeff * (UBER_MILESTONES_TIME_MULTIPLIER - 1.0) + 1.0),
                 )
 
     def start_uber(self):
-        self.uber_strength = UBER_ACTIVE_STRENGTH * (UBER_STREAK_MULTIPLIER ** self.uberstreak)
+        self.uber_strength = UBER_ACTIVE_STRENGTH * (UBER_STREAK_MULTIPLIER**self.uberstreak)
 
     def end_uber(self):
         self.uber_strength = 0
         self.uberstreak += 1
+
+    def end_uber_death(self):
+        self.uber_strength = 0
+        self.uberstreak = 0
 
     def update(self):
         self.last_strength = self.current_strength

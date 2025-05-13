@@ -2,3 +2,5 @@ dxcam
 python-valve
 buttplug-py
 Pillow
+ruamel.yaml
+numpy
