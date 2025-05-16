@@ -1,20 +1,53 @@
+"""Scripts for handling the reward vibration strength and buzzes."""
+
 import time
-from config import *
 
 
 class VibrationHandler:
-    def __init__(self, logger, rcon):
+    """Handles the reward vibration strength and buzzes."""
+
+    def __init__(self, logger, rcon, config: dict):
         self.logger = logger
         self.rcon = rcon
         self.uber_strength = 0  # uber active strength
-        self.timed_buzzes = []  # list of timed vibration activations
+        # Timed buzzes are a list of tuples of (strength, time_end)
+        self.timed_buzzes: list[tuple[float, float]] = []  # list of timed vibration activations
         self._curr_strength = 0  # current strength priv variable
         self.last_strength = 0
         self.killstreak = 0  # killstreak tracking
         self.uberstreak = 0
 
+        # Set config args
+        self.activate_command: str = config["activate_command"]
+        self.deactivate_command: str = config["deactivate_command"]
+        self.base_vibe: float = config["base_vibe"]
+        # Kills
+        self.kill_strength: float = config["kill_strength"]
+        self.kill_time: float = config["kill_time"]
+        self.kill_crit_strength_multiplier: float = config["kill_crit_strength_multiplier"]
+        self.kill_crit_time_multiplier: float = config["kill_crit_time_multiplier"]
+
+        # Killstreaks
+        self.killstreak_strength_multiplier: float = config["killstreak_strength_multiplier"]
+        self.killstreak_time_multiplier: float = config["killstreak_time_multiplier"]
+        self.killstreak_max: int = config["killstreak_max"]
+
+        # Death
+        self.death_strength: float = config["death_strength"]
+        self.death_time: float = config["death_time"]
+
+        # Uber
+        self.uber_active_strength: float = config["uber_active_strength"]
+        self.uber_streak_multiplier: float = config["uber_streak_multiplier"]
+        self.uber_milestones: list[int] = config["uber_milestones"]
+        self.uber_milestone_strength: float = config["uber_milestone_strength"]
+        self.uber_milestone_time: float = config["uber_milestone_time"]
+        self.uber_milestone_strength_multiplier: float = config["uber_milestone_strength_multiplier"]
+        self.uber_milestone_time_multiplier: float = config["uber_milestone_time_multiplier"]
+
     @property
     def current_strength(self):
+        """Getter for the current strength."""
         return self._curr_strength
 
     @current_strength.setter
@@ -23,56 +56,65 @@ class VibrationHandler:
             self._curr_strength = new_strength
 
     def timed_buzz(self, strength, time_end):
+        """Add a timed buzz to the queue."""
         self.timed_buzzes.append((strength, time.time() + time_end))
 
     def death(self):
+        """On death, trigger a reward ;3 based on the current streak."""
         self.killstreak = 0
         self.end_uber_death()
-        self.timed_buzz(DEATH_STRENGTH, DEATH_TIME)
+        self.timed_buzz(self.death_strength, self.death_time)
 
     def kill(self, crit=False):
+        """On kill, trigger reward based on current streak."""
         self.killstreak += 1
         # [0, 1]
-        killstreak_coeff = min(self.killstreak, KILLSTREAK_MAX) / (KILLSTREAK_MAX)
+        killstreak_coeff = min(self.killstreak, self.killstreak_max) / (self.killstreak_max)
 
         strength = (
-            KILL_STRENGTH
-            * (killstreak_coeff * (KILLSTREAK_STRENGTH_MULTIPLIER - 1.0) + 1.0)
-            * (KILL_CRIT_STRENGTH_MULTIPLIER if crit else 1.0)
+            self.kill_strength
+            * (killstreak_coeff * (self.killstreak_strength_multiplier - 1.0) + 1.0)
+            * (self.kill_crit_strength_multiplier if crit else 1.0)
         )
-        time = (
-            KILL_TIME
-            * (killstreak_coeff * (KILLSTREAK_TIME_MULTIPLIER - 1.0) + 1.0)
-            * (KILL_CRIT_TIME_MULTIPLIER if crit else 1.0)
+        kill_time = (
+            self.kill_time
+            * (killstreak_coeff * (self.killstreak_time_multiplier - 1.0) + 1.0)
+            * (self.kill_crit_time_multiplier if crit else 1.0)
         )
 
-        self.timed_buzz(strength, time)
+        self.timed_buzz(strength, kill_time)
 
     def uber_milestone(self, uber_percent, last_uber_percent):
-        for i, x in enumerate(UBER_MILESTONES):
+        """Check if we hit an uber milestone and reward accordingly."""
+        for i, x in enumerate(self.uber_milestones):
             if uber_percent > x >= last_uber_percent:
                 self.logger.info(f"Hit Uber milestone {x}")
-                uber_milestone_coeff = i / len(UBER_MILESTONES) - 1
+                uber_milestone_coeff = i / len(self.uber_milestones) - 1
                 self.timed_buzz(
-                    UBER_MILESTONE_STRENGTH
-                    * (uber_milestone_coeff * (UBER_MILESTONE_STRENGTH_MULTIPLIER - 1.0) + 1.0),
-                    UBER_MILESTONE_TIME * (uber_milestone_coeff * (UBER_MILESTONES_TIME_MULTIPLIER - 1.0) + 1.0),
+                    self.uber_milestone_strength
+                    * (uber_milestone_coeff * (self.uber_milestone_strength_multiplier - 1.0) + 1.0),
+                    self.uber_milestone_time
+                    * (uber_milestone_coeff * (self.uber_milestone_time_multiplier - 1.0) + 1.0),
                 )
 
     def start_uber(self):
-        self.uber_strength = UBER_ACTIVE_STRENGTH * (UBER_STREAK_MULTIPLIER**self.uberstreak)
+        """On start of uber, set strength based on the current streak."""
+        self.uber_strength = self.uber_active_strength * (self.uber_streak_multiplier**self.uberstreak)
 
     def end_uber(self):
+        """On end of uber, reset the strength and increment the streak."""
         self.uber_strength = 0
         self.uberstreak += 1
 
     def end_uber_death(self):
+        """On death, reset the uber strength and streak."""
         self.uber_strength = 0
         self.uberstreak = 0
 
     def update(self):
+        """Update the current strength based on the timed buzzes and the base vibe."""
         self.last_strength = self.current_strength
-        self._curr_strength = BASE_VIBE
+        self._curr_strength = self.base_vibe
 
         now = time.time()
 
@@ -84,19 +126,21 @@ class VibrationHandler:
 
         self.timed_buzzes = list(filter(lambda x: x[1] > now, self.timed_buzzes))
 
-        if self.current_strength > BASE_VIBE >= self.last_strength:
-            if ACTIVATE_COMMAND != "":
+        # Check if we need to run the activate/deactivate command
+        if self.current_strength > self.base_vibe >= self.last_strength:
+            if self.activate_command != "":
                 self.logger.info("Running activate command")
-                self.rcon.execute(ACTIVATE_COMMAND)
-        if self.current_strength <= BASE_VIBE < self.last_strength:
-            if DEACTIVATE_COMMAND != "":
+                self.rcon.execute(self.activate_command)
+        if self.current_strength <= self.base_vibe < self.last_strength:
+            if self.deactivate_command != "":
                 self.logger.info("Running deactivate command")
-                self.rcon.execute(DEACTIVATE_COMMAND)
+                self.rcon.execute(self.deactivate_command)
 
         return self.current_strength
 
     # Takes a list of devices and activates devices based on vibration handling
     async def run_buzz(self, devices):
+        """Update the vibration strength and run the command on all devices."""
         vibe_strength = self.update()
 
         # activate all actuators
