@@ -1,6 +1,7 @@
 """Team Frotress 2 main module."""
 
 # pylint: disable=logging-fstring-interpolation
+# pylint: disable=anomalous-backslash-in-string
 
 from __future__ import annotations
 
@@ -27,7 +28,8 @@ import log_tailer
 import vibration_handler
 
 PLATFORM = platform.system()
-if platform == "Windows":
+print(f"Detected platform: {PLATFORM}")
+if PLATFORM == "Windows":
     import dxcam
 
 if not os.path.isfile("config.py"):
@@ -35,7 +37,8 @@ if not os.path.isfile("config.py"):
     sys.exit()
 
 
-def get_uber_bar_region(resolution: tuple[int, int]) -> tuple[tuple[int, int, int, int], bool]:
+# pylint: disable=too-many-statements
+def get_uber_bar_region(resolution: tuple[int, int], os_platform: str) -> tuple[tuple[int, int, int, int], bool]:
     """
     Fetch the coords of the uber bar region based on the screen resolution.
 
@@ -43,16 +46,19 @@ def get_uber_bar_region(resolution: tuple[int, int]) -> tuple[tuple[int, int, in
     ----------
     resolution : tuple[int, int]
         The screen resolution (width, height).
+    os_platform : str
+        The operating system platform (Linux or Windows).
 
     Returns
     -------
     tuple[tuple[int, int, int, int], bool]
-        The coordinates of the uber bar region (left, top, right, bottom) and a boolean indicating if medic uber support is enabled.
+        The coordinates of the uber bar region (left, top, right, bottom) and a
+        boolean indicating if medic uber support is enabled.
     """
 
     medic_uber_support = True
-    logging.info(f"Detected platform: {PLATFORM}")
-    if PLATFORM == "Linux":
+    logging.info(f"Detected platform: {os_platform}")
+    if os_platform == "Linux":
         resolution_raw = (
             subprocess.Popen(
                 'xrandr | grep "\*" | cut -d" " -f4', shell=True, stdout=subprocess.PIPE
@@ -91,7 +97,7 @@ def get_uber_bar_region(resolution: tuple[int, int]) -> tuple[tuple[int, int, in
                     Currently supported resolutions are:\n1920x1080\nMedic Uber Charge functionality will not work"
             )
     # This does not check for resolution and really should
-    elif PLATFORM == "Windows":
+    elif os_platform == "Windows":
         print("Widows OS: Using provided resolution.")
         if resolution == (2560, 1440):
             bar_topleft = (1055, 984)
@@ -225,7 +231,7 @@ def colour_percentage(image: Image.Image, colour: tuple[int, int, int]) -> float
 
 
 def uber_image_grabber(
-    full_bar_region: tuple[int, int, int, int], dxc: Optional[DXCamera] | None = None
+    full_bar_region: tuple[int, int, int, int], os_platform: str, dxc: Optional[DXCamera] | None = None
 ) -> Image.Image:
     """
     Grabs the image of the full uber bar.
@@ -234,6 +240,8 @@ def uber_image_grabber(
     ----------
     full_bar_region : tuple[int, int, int, int]
         The region of the screen to grab (left, top, right, bottom).
+    os_platform : str
+        The operating system platform (Linux or Windows).
     dxc : Optional[DXCamera]
         The DXCamera object to use for grabbing the image (Windows only).
 
@@ -242,9 +250,9 @@ def uber_image_grabber(
     Image.Image
         The image of the uber bar.
     """
-    if platform == "Linux":
+    if os_platform == "Linux":
         return ImageGrab.grab(bbox=full_bar_region)
-    elif platform == "Windows":
+    elif os_platform == "Windows":
         assert dxc is not None, "DXCamera object is required for Windows"  # For type safety
         frame = None
         while frame is None:
@@ -255,13 +263,17 @@ def uber_image_grabber(
 
 
 def uber_percentage_grabber(
-    uber_bar_region: tuple[int, int, int, int], dxc: Optional[DXCamera], debug: bool, debug_dir: str
+    uber_bar_region: tuple[int, int, int, int], os_platform: str, dxc: Optional[DXCamera], debug: bool, debug_dir: str
 ) -> tuple[int | None, str | None]:
     """
     Returns the current uber percentage calculated from a screengrab.
 
     Paramters
     ----------
+    uber_bar_region : tuple[int, int, int, int]
+        The region of the screen to grab (left, top, right, bottom).
+    os_platform : str
+        The operating system platform (Linux or Windows).
     dxc : DXCamera
         The DXCamera object to use for grabbing the image.
     debug : bool
@@ -274,13 +286,15 @@ def uber_percentage_grabber(
     int
         The current uber percentage.
     """
-    if platform == "Linux":
+    if os_platform == "Linux":
         img = uber_image_grabber(
             full_bar_region=uber_bar_region,
+            os_platform=os_platform,
         )
-    elif platform == "Windows":
+    elif os_platform == "Windows":
         img = uber_image_grabber(
             full_bar_region=uber_bar_region,
+            os_platform=os_platform,
             dxc=dxc,
         )
         if debug:
@@ -296,8 +310,6 @@ def uber_percentage_grabber(
         image=img, allowed_colours=[colour_background, colour_regular_fill, colour_uber_max_or_draining]
     ):
         print("!! Uber requested but not visible")
-        colours_in_image = get_colours_in_image(img)
-        print(f"!! Uber bar colours: {colours_in_image}")
         return None, None
 
     bar_status = "building"
@@ -319,7 +331,7 @@ def uber_percentage_grabber(
     return filled_percentage_int, bar_status
 
 
-async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXCamera]) -> None:
+async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str, dxc: Optional[DXCamera]) -> None:
     """
     Main function to run the Team Frotress 2 script.
 
@@ -331,6 +343,8 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
         The RCON object to use for sending commands.
     logfile : str
         The path to the TF2 console log file.
+    os_platform : str
+        The operating system platform (Linux or Windows).
     dxc : Optional[DXCamera]
         The DXCamera object to use for grabbing images (Windows only).
     """
@@ -384,9 +398,14 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
     currently_ubered = False
     curr_class = ""
     curr_weapon = -1
-    uber_bar_region, medic_uber_support = get_uber_bar_region(resolution=app_config["tf2"]["resolution"])
+    resolution = tuple(app_config["tf2"]["resolution"])  # need to convert to tuple since yaml loads as list
+    uber_bar_region, medic_uber_support = get_uber_bar_region(resolution=resolution, os_platform=os_platform)
+    logging.info(f"Uber bar region: {uber_bar_region}, medic_uber_support: {medic_uber_support}")
 
-    vibe = vibration_handler.VibrationHandler(logging, app_rcon)
+    logging.info("Settign up vibe handler")
+    vibe = vibration_handler.VibrationHandler(logging, app_rcon, config=app_config["vibe"])
+
+    logging.info("### ready! ###")
 
     while True:
         # detect kills & class / weapon switches from console log
@@ -396,8 +415,9 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
                 break
 
             if switch_match := re.match(
-                """\d\d\/\d\d\/\d\d\d\d - \d\d:\d\d:\d\d: teamfrotress_(\w+)""", string=line
-            ):  # pylint: disable=anomalous-backslash-in-string
+                """\d\d\/\d\d\/\d\d\d\d - \d\d:\d\d:\d\d: teamfrotress_(\w+)""",
+                string=line,
+            ):
                 if switch_match[1] in [
                     "scout",
                     "soldier",
@@ -418,7 +438,7 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
                     curr_weapon = int(switch_match[1][-1])
 
             if killfeed_match := re.match(
-                pattern="""\d\d\/\d\d\/\d\d\d\d - \d\d:\d\d:\d\d: ([^\n]{0,32}) killed ([^\n]{0,32}) with (\w+)\. ?(\(crit\))?""",
+                pattern="""\d\d\/\d\d\/\d\d\d\d - \d\d:\d\d:\d\d: ([^\n]{0,32}) killed ([^\n]{0,32}) with (\w+)\. ?(\(crit\))?""",  # pylint: disable=line-too-long
                 string=line,
             ):
 
@@ -432,6 +452,7 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
         if curr_class == "medic" and medic_uber_support and (curr_weapon == 2 or curr_weapon == 3):
             uber_grabbed, bar_status = uber_percentage_grabber(
                 uber_bar_region=uber_bar_region,
+                os_platform=os_platform,
                 dxc=dxc,
                 debug=app_config["debug"],
                 debug_dir=app_config["paths"]["debug_save_dir"],
@@ -454,10 +475,10 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
                     logging.info("Activated Uber!")
                     currently_ubered = True
                     vibe.start_uber()
-            else:
-                # check for increase in uber - note this sometimes happens during an uber due to use of ubersaw
-                if current_uber > last_uber:
-                    vibe.uber_milestone(current_uber, last_uber)
+
+            # check for increase in uber - note this sometimes happens during an uber due to use of ubersaw
+            if current_uber > last_uber:
+                vibe.uber_milestone(current_uber, last_uber)
 
             # uber ended - threhold is 5% since the exact frame of 0 might be skipped
             if currently_ubered and (current_uber < 5):
@@ -466,7 +487,8 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, dxc: Optional[DXC
                 vibe.end_uber()
         # ubered but bar not visible
         elif currently_ubered:
-            # Last time we saw it, we were ubered, maybe figure out something, but for now, we have to wait to see the bar again
+            # Last time we saw it, we were ubered, maybe figure out something, but for now, we have to wait to see the
+            # bar again
             pass
 
         # run vibrator
@@ -508,17 +530,17 @@ if __name__ == "__main__":
         with open("rconpass.txt", mode="w", encoding="UTF-8") as f:
             f.write(RCON_PASSWORD)
 
-    if platform == "Windows":
+    if PLATFORM == "Windows":
         tf2_args = [config_paths["tf2_game_executable"]]
     else:
         tf2_args = ["~/.steam/bin32/steam-runtime/run.sh", config_paths["tf2_game_executable"]]
 
     added_args = (
-        " -game tf -steam -secure -usercon +developer 1 +alias developer +ip 0.0.0.0 +alias ip +sv_rcon_whitelist_address 127.0.0.1 +alias sv_rcon_whitelist_address +rcon_password "
+        " -game tf -steam -secure -usercon +developer 1 +alias developer +ip 0.0.0.0 +alias ip +sv_rcon_whitelist_address 127.0.0.1 +alias sv_rcon_whitelist_address +rcon_password "  # pylint: disable=line-too-long
         + RCON_PASSWORD
         + " +alias rcon_password +hostport "
         + str(config_networking["rcon_port"])
-        + " +alias hostport +alias cl_reload_localization_files +net_start +con_timestamp 1 +alias con_timestamp -condebug -conclearlog "
+        + " +alias hostport +alias cl_reload_localization_files +net_start +con_timestamp 1 +alias con_timestamp -condebug -conclearlog "  # pylint: disable=line-too-long
         + config_tf2["extra_launch_options"]
     ).split()
     tf2_args.extend(added_args)
@@ -540,7 +562,7 @@ if __name__ == "__main__":
         print(f"Could not connect to RCON server: {e}")
         exit()
 
-    if platform == "Windows":
+    if PLATFORM == "Windows":
         DXCAMERA = dxcam.create()
     else:
         DXCAMERA = None
@@ -551,4 +573,4 @@ if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     with open(config_paths["tf2_console_log"], mode="r", encoding="UTF-8") as f:
-        asyncio.run(main(app_config=config, app_rcon=rcon, logfile=f, dxc=DXCAMERA))
+        asyncio.run(main(app_config=config, app_rcon=rcon, logfile=f, os_platform=PLATFORM, dxc=DXCAMERA))
