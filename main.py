@@ -14,6 +14,7 @@ import sys
 import os
 import platform
 import random
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -394,6 +395,7 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
     logging.info("Ready to play!")
 
     current_uber = 0
+    uber_start = None
     last_uber = 0
     currently_ubered = False
     curr_class = ""
@@ -474,6 +476,7 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
                     # uber activated
                     logging.info("Activated Uber!")
                     currently_ubered = True
+                    uber_start = time.time()
                     vibe.start_uber()
 
             # check for increase in uber - note this sometimes happens during an uber due to use of ubersaw
@@ -489,7 +492,18 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
         elif currently_ubered:
             # Last time we saw it, we were ubered, maybe figure out something, but for now, we have to wait to see the
             # bar again
-            pass
+            now = time.time()
+            # if more than 8 seconds have passed since the start of the uber, assume it ended
+            if uber_start is None:
+                # this shouldn't be possible
+                print("Uber was appanrently active, but start time is None, this should not happen. Doing nothing.")
+            elif now - uber_start > 8:
+                print("Uber ended, but bar not visible")
+                currently_ubered = False
+                vibe.end_uber()
+            else:
+                # we are still ubered, but the bar is not visible
+                print("Uber is still active, but bar not visible")
 
         # run vibrator
         await vibe.run_buzz(devices=client.devices)
