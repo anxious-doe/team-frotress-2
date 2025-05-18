@@ -395,7 +395,8 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
     logging.info("Ready to play!")
 
     current_uber = 0
-    uber_start = None
+    last_seen_uber_percentage = 0
+    last_seen_uber_time = time.time()
     last_uber = 0
     currently_ubered = False
     curr_class = ""
@@ -470,13 +471,14 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
         if uber_grabbed is not None:
             last_uber = current_uber
             current_uber = uber_grabbed
+            last_seen_uber_percentage = current_uber
+            last_seen_uber_time = time.time()
 
             if not currently_ubered:
                 if bar_status == "draining":
                     # uber activated
                     logging.info("Activated Uber!")
                     currently_ubered = True
-                    uber_start = time.time()
                     vibe.start_uber()
 
             # check for increase in uber - note this sometimes happens during an uber due to use of ubersaw
@@ -490,20 +492,17 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
                 vibe.end_uber()
         # ubered but bar not visible
         elif currently_ubered:
-            # Last time we saw it, we were ubered, maybe figure out something, but for now, we have to wait to see the
-            # bar again
-            now = time.time()
-            # if more than 8 seconds have passed since the start of the uber, assume it ended
-            if uber_start is None:
-                # this shouldn't be possible
-                print("Uber was appanrently active, but start time is None, this should not happen. Doing nothing.")
-            elif now - uber_start > 8:
-                print("Uber ended, but bar not visible")
+            # calculate the amount of time that the current uber has left based on last percentage and time
+            time_since_last_seen = time.time() - last_seen_uber_time
+            last_seen_uber_time_estimate = last_seen_uber_percentage / 100 * 8  # 8 seconds is max uber duration
+            if time_since_last_seen > last_seen_uber_time_estimate:
+                # end uber
                 currently_ubered = False
                 vibe.end_uber()
-            else:
-                # we are still ubered, but the bar is not visible
-                print("Uber is still active, but bar not visible")
+                print(
+                    f"uber ended since bar not visible for {time_since_last_seen} seconds and last seen percentage"
+                    f" was {last_seen_uber_percentage}%"
+                )
 
         # run vibrator
         await vibe.run_buzz(devices=client.devices)
