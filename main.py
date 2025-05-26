@@ -300,17 +300,23 @@ def uber_percentage_grabber(
         )
         if debug:
             # Save image for debugging
-            img.save(f"{debug_dir}/uber_bar_region.png")
+            now = time.strftime("%Y-%m-%d_%H-%M-%S")
+            img_out_path = Path(debug_dir) / f"uber_bar_{now}.png"
+            img.save(img_out_path)
 
     colour_background = (24, 24, 24)
     colour_regular_fill = (255, 253, 252)
+    # regular bar fill sometimes is also another colour, not sure why...
+    colour_regular_fill_alt = (255, 255, 255)
     colour_uber_max_or_draining = (184, 217, 255)
 
     # ensure that the image only contains the colours of the bar
     if not only_colours_in_image(
-        image=img, allowed_colours=[colour_background, colour_regular_fill, colour_uber_max_or_draining]
+        image=img,
+        allowed_colours=[colour_background, colour_regular_fill, colour_uber_max_or_draining, colour_regular_fill_alt],
     ):
         print("!! Uber requested but not visible")
+        print(f"colours in image: {get_colours_in_image(image=img)}")
         return None, None
 
     bar_status = "building"
@@ -405,7 +411,7 @@ async def main(app_config: dict, app_rcon: RCON, logfile: str, os_platform: str,
     uber_bar_region, medic_uber_support = get_uber_bar_region(resolution=resolution, os_platform=os_platform)
     logging.info(f"Uber bar region: {uber_bar_region}, medic_uber_support: {medic_uber_support}")
 
-    logging.info("Settign up vibe handler")
+    logging.info("Setting up vibe handler")
     vibe = vibration_handler.VibrationHandler(logging, app_rcon, config=app_config["vibe"])
 
     logging.info("### ready! ###")
